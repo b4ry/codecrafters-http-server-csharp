@@ -26,7 +26,7 @@ while (true)
         {
             case string s when s.StartsWith("/files/"):
                 requestArgument = urlPath[7..];
-                var filePath = $"/tmp/data/codecrafters.io/http-server-tester/{requestArgument}";
+                var filePath = $"{Environment.GetCommandLineArgs()[2]}{requestArgument}";
 
                 if (File.Exists(filePath))
                 {

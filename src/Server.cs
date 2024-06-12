@@ -6,8 +6,10 @@ using System.Text.RegularExpressions;
 TcpListener server = new(IPAddress.Any, 4221);
 server.Start();
 
+Regex httpMethodRegex = new("^GET|POST");
 Regex urlPathRegex = new("\\/\\S*");
 Regex userAgentRegex = new("User-Agent: \\S*");
+Regex contentLengthRegex = new("Content-Length: \\S*");
 var crlf = "\r\n";
 
 while (true)
@@ -25,27 +27,41 @@ while (true)
         switch (urlPath)
         {
             case string s when s.StartsWith("/files/"):
+                var httpMethod = httpMethodRegex.Match(decodedReceivedData).ToString();
                 requestArgument = urlPath[7..];
                 var filePath = $"{Environment.GetCommandLineArgs()[2]}{requestArgument}";
 
-                if (File.Exists(filePath))
+                if (httpMethod == "GET")
                 {
-                    var file = await File.ReadAllBytesAsync(filePath);
-                    var fileContent = Encoding.ASCII.GetString(file);
+                    if (File.Exists(filePath))
+                    {
+                        var file = await File.ReadAllBytesAsync(filePath);
+                        var fileContent = Encoding.ASCII.GetString(file);
 
-                    response =
-                        Encoding.ASCII.GetBytes(
-                            $"HTTP/1.1 200 OK{crlf}" +
-                            $"Content-Type: application/octet-stream{crlf}" +
-                            $"Content-Length:{file.Length}{crlf}{crlf}{fileContent}");
+                        response =
+                            Encoding.ASCII.GetBytes(
+                                $"HTTP/1.1 200 OK{crlf}" +
+                                $"Content-Type: application/octet-stream{crlf}" +
+                                $"Content-Length:{file.Length}{crlf}{crlf}{fileContent}");
+                    }
+                    else
+                    {
+                        response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
+                    }
                 }
-                else
+                else if(httpMethod == "POST")
                 {
-                    response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
+                    var contentLength = int.Parse(contentLengthRegex.Match(decodedReceivedData).ToString()[16..]);
+                    var dataToWrite = decodedReceivedData.Split($"{crlf}{crlf}")[1][..contentLength];
+
+                    await File.WriteAllTextAsync(filePath, dataToWrite);
+
+                    response = Encoding.ASCII.GetBytes($"HTTP/1.1 201 Created{crlf}{crlf}");
                 }
                 break;
             case string s when s.StartsWith("/echo/"):
                 requestArgument = urlPath[6..];
+
                 response =
                     Encoding.ASCII.GetBytes(
                         $"HTTP/1.1 200 OK{crlf}" +
@@ -54,6 +70,7 @@ while (true)
                 break;
             case "/user-agent":
                 var userAgentHeader = userAgentRegex.Match(decodedReceivedData).ToString()[12..];
+
                 response =
                     Encoding.ASCII.GetBytes(
                         $"HTTP/1.1 200 OK{crlf}" +

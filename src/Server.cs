@@ -10,48 +10,49 @@ Regex urlPathRegex = new("\\/\\S*");
 Regex userAgentRegex = new("User-Agent: \\S*");
 var crlf = "\r\n";
 
-using (var socket = server.AcceptSocket())
+while (true)
 {
-    var receivedData = new byte[2048];
-    await socket.ReceiveAsync(receivedData);
-
-    var decodedReceivedData = Encoding.ASCII.GetString(receivedData);
-    var urlPath = urlPathRegex.Match(decodedReceivedData).ToString();
-    var response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK{crlf}{crlf}");
-
-    switch(urlPath)
+    using (var socket = await server.AcceptSocketAsync())
     {
-        case string s when s.StartsWith("/echo/"):
-            var requestArgument = urlPath[6..];
-            response =
-                Encoding.ASCII.GetBytes(
-                    $"HTTP/1.1 200 OK{crlf}" +
-                    $"Content-Type: text/plain{crlf}" +
-                    $"Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
-            break;
-        case "/user-agent":
-            var userAgentHeader = userAgentRegex.Match(decodedReceivedData).ToString()[12..];
-            response =
-                Encoding.ASCII.GetBytes(
-                    $"HTTP/1.1 200 OK{crlf}" +
-                    $"Content-Type: text/plain{crlf}" +
-                    $"Content-Length:{userAgentHeader.Length}{crlf}{crlf}{userAgentHeader}");
-            break;
-        case "/":
-            break;
-        default:
-            response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
-            break;
-    }
+        var receivedData = new byte[2048];
+        await socket.ReceiveAsync(receivedData);
 
-    try
-    {
-        await socket.SendAsync(response);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Exception while sending a response back! {ex}");
+        var decodedReceivedData = Encoding.ASCII.GetString(receivedData);
+        var urlPath = urlPathRegex.Match(decodedReceivedData).ToString();
+        var response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK{crlf}{crlf}");
+
+        switch (urlPath)
+        {
+            case string s when s.StartsWith("/echo/"):
+                var requestArgument = urlPath[6..];
+                response =
+                    Encoding.ASCII.GetBytes(
+                        $"HTTP/1.1 200 OK{crlf}" +
+                        $"Content-Type: text/plain{crlf}" +
+                        $"Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
+                break;
+            case "/user-agent":
+                var userAgentHeader = userAgentRegex.Match(decodedReceivedData).ToString()[12..];
+                response =
+                    Encoding.ASCII.GetBytes(
+                        $"HTTP/1.1 200 OK{crlf}" +
+                        $"Content-Type: text/plain{crlf}" +
+                        $"Content-Length:{userAgentHeader.Length}{crlf}{crlf}{userAgentHeader}");
+                break;
+            case "/":
+                break;
+            default:
+                response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
+                break;
+        }
+
+        try
+        {
+            await socket.SendAsync(response);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception while sending a response back! {ex}");
+        }
     }
 }
-
-server.Stop();

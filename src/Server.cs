@@ -8,8 +8,9 @@ server.Start();
 
 Regex httpMethodRegex = new("^GET|POST");
 Regex urlPathRegex = new("\\/\\S*");
-Regex userAgentRegex = new("User-Agent: \\S*");
-Regex contentLengthRegex = new("Content-Length: \\S*");
+Regex userAgentRegex = new("[Uu]ser-[Aa]gent: \\S*");
+Regex contentLengthRegex = new("[Cc]ontent-[Ll]ength: \\S*");
+Regex acceptEncodingRegex = new("[Aa]ccept-[Ee]ncoding: \\S*");
 var crlf = "\r\n";
 
 while (true)
@@ -61,12 +62,26 @@ while (true)
                 break;
             case string s when s.StartsWith("/echo/"):
                 requestArgument = urlPath[6..];
+                var acceptEncoding = acceptEncodingRegex.Match(decodedReceivedData).ToString()[17..];
 
-                response =
-                    Encoding.ASCII.GetBytes(
-                        $"HTTP/1.1 200 OK{crlf}" +
-                        $"Content-Type: text/plain{crlf}" +
-                        $"Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
+                if (acceptEncoding == "invalid-encoding")
+                {
+                    response =
+                        Encoding.ASCII.GetBytes(
+                            $"HTTP/1.1 200 OK{crlf}" +
+                            $"Content-Type: text/plain{crlf}" +
+                            $"Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
+                }
+                else
+                {
+                    response =
+                        Encoding.ASCII.GetBytes(
+                            $"HTTP/1.1 200 OK{crlf}" +
+                            $"Content-Encoding: {acceptEncoding}{crlf}" + 
+                            $"Content-Type: text/plain{crlf}" +
+                            $"Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
+                }
+
                 break;
             case "/user-agent":
                 var userAgentHeader = userAgentRegex.Match(decodedReceivedData).ToString()[12..];

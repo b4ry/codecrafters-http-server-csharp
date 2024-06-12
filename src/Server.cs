@@ -62,7 +62,12 @@ while (true)
                 break;
             case string s when s.StartsWith("/echo/"):
                 requestArgument = urlPath[6..];
-                var acceptEncoding = acceptEncodingRegex.Match(decodedReceivedData).ToString()[17..];
+                var acceptEncoding = acceptEncodingRegex.Match(decodedReceivedData)?.ToString();
+
+                if(acceptEncoding?.Length > 16)
+                {
+                    acceptEncoding = acceptEncoding[17..];
+                }
 
                 if (acceptEncoding == "invalid-encoding")
                 {

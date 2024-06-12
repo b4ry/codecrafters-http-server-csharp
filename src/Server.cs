@@ -20,11 +20,32 @@ while (true)
         var decodedReceivedData = Encoding.ASCII.GetString(receivedData);
         var urlPath = urlPathRegex.Match(decodedReceivedData).ToString();
         var response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK{crlf}{crlf}");
+        string requestArgument = string.Empty;
 
         switch (urlPath)
         {
+            case string s when s.StartsWith("/files/"):
+                requestArgument = urlPath[7..];
+                var filePath = $"/tmp/{requestArgument}";
+
+                if (File.Exists(filePath))
+                {
+                    var file = await File.ReadAllBytesAsync(filePath);
+                    var fileContent = Encoding.ASCII.GetString(file);
+
+                    response =
+                        Encoding.ASCII.GetBytes(
+                            $"HTTP/1.1 200 OK{crlf}" +
+                            $"Content-Type: application/octet-stream{crlf}" +
+                            $"Content-Length:{file.Length}{crlf}{crlf}{fileContent}");
+                }
+                else
+                {
+                    response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
+                }
+                break;
             case string s when s.StartsWith("/echo/"):
-                var requestArgument = urlPath[6..];
+                requestArgument = urlPath[6..];
                 response =
                     Encoding.ASCII.GetBytes(
                         $"HTTP/1.1 200 OK{crlf}" +

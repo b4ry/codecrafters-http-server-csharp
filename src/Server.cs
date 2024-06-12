@@ -7,6 +7,7 @@ TcpListener server = new(IPAddress.Any, 4221);
 server.Start();
 
 Regex urlPathRegex = new("\\/\\S*");
+var crlf = "\r\n";
 
 using (var socket = server.AcceptSocket())
 {
@@ -15,11 +16,17 @@ using (var socket = server.AcceptSocket())
 
     var decodedReceivedData = Encoding.ASCII.GetString(receivedData);
     var urlPath = urlPathRegex.Match(decodedReceivedData).ToString();
-    var response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\n\r\n");
+    var response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK{crlf}{crlf}");
 
-    if (urlPath != "/")
+    if (urlPath.StartsWith("/echo/"))
     {
-        response = Encoding.ASCII.GetBytes("HTTP/1.1 404 Not Found\r\n\r\n");
+        var requestArgument = urlPath[6..];
+        response =
+            Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK{crlf}Content-Type: text/plain{crlf}Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
+    }
+    else if (urlPath != "/")
+    {
+        response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
     }
 
     try

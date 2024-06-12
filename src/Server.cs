@@ -12,7 +12,6 @@ using (var socket = server.AcceptSocket())
     try
     {
         await socket.SendAsync(response);
-        await Task.Delay(100);
     }
     catch(Exception ex)
     {

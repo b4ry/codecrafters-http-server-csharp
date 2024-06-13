@@ -15,8 +15,14 @@ namespace codecrafters_http_server.DTOs
         public override string ToString()
         {
             StringBuilder sb = new();
+            var httpStatusCodeString = HttpStatusCode.ToString();
+
+            if(httpStatusCodeString == System.Net.HttpStatusCode.NotFound.ToString())
+            {
+                httpStatusCodeString = "Not Found";
+            }
             
-            sb.Append($"{Protocol} {(int)HttpStatusCode!} {HttpStatusCode}{Constants.Constants.Crlf}");
+            sb.Append($"{Protocol} {(int)HttpStatusCode!} {httpStatusCodeString}{Constants.Constants.Crlf}");
 
             if(!string.IsNullOrEmpty(ContentType))
             {

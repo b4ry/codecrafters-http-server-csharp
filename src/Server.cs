@@ -62,11 +62,11 @@ while (true)
                 break;
             case string s when s.StartsWith(EndpointPaths.Echo):
                 requestArgument = urlPath[6..];
-                var encodings = headers["Accept-Encoding"].Split(", ");
+                headers.TryGetValue("Accept-Encoding", out string? encodings);
 
                 if (encodings?.Length > 0)
                 {
-                    var validEncoding = encodings.Intersect(Constants.ValidEncodings);
+                    var validEncoding = encodings.Split(", ").Intersect(Constants.ValidEncodings);
 
                     if(validEncoding.Contains("gzip"))
                     {

@@ -1,6 +1,7 @@
 using codecrafters_http_server.Constants;
 using codecrafters_http_server.DTOs;
 using codecrafters_http_server.Helpers;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -15,9 +16,9 @@ while (true)
         var receivedData = new byte[2048];
         await socket.ReceiveAsync(receivedData);
 
-        var decodedReceivedData = Encoding.ASCII.GetString(receivedData);
+        var (urLine, headers, body) = RequestParser.ParseRequest(receivedData);
 
-        var urlPath = RegexParser.UrlPathRegex().Match(decodedReceivedData).ToString();
+        var urlPath = RegexParser.UrlPathRegex().Match(urLine).ToString();
         var response = new Response()
         {
             Protocol = HttpProtocols.Http11,
@@ -28,7 +29,7 @@ while (true)
         switch (urlPath)
         {
             case string s when s.StartsWith(EndpointPaths.Files):
-                var httpMethod = RegexParser.HttpMethodRegex.Match(decodedReceivedData).ToString();
+                var httpMethod = RegexParser.HttpMethodRegex.Match(urLine).ToString();
                 requestArgument = urlPath[7..];
                 var filePath = $"{Environment.GetCommandLineArgs()[2]}{requestArgument}";
 
@@ -51,8 +52,8 @@ while (true)
                 }
                 else if(httpMethod == HttpMethod.Post.ToString())
                 {
-                    var contentLength = int.Parse(RegexParser.ContentLengthRegex().Match(decodedReceivedData).ToString()[16..]);
-                    var dataToWrite = decodedReceivedData.Split($"{Constants.Crlf}{Constants.Crlf}")[1][..contentLength];
+                    var contentLength = headers["Content-Length"];
+                    var dataToWrite = body;
 
                     await File.WriteAllTextAsync(filePath, dataToWrite);
 
@@ -61,26 +62,34 @@ while (true)
                 break;
             case string s when s.StartsWith(EndpointPaths.Echo):
                 requestArgument = urlPath[6..];
-                var encodings = decodedReceivedData.Split(Constants.Crlf).FirstOrDefault(x => x.StartsWith("Accept-Encoding:"))?[16..].Split(",").Select(x => x.Trim());
+                var encodings = headers["Accept-Encoding"].Split(", ");
 
-                if (encodings?.Count() > 0)
+                if (encodings?.Length > 0)
                 {
-                    var validEncoding = encodings.Intersect(Constants.ValidEncodings).FirstOrDefault();
+                    var validEncoding = encodings.Intersect(Constants.ValidEncodings);
 
-                    if(validEncoding != null)
+                    if(validEncoding.Contains("gzip"))
                     {
-                        response.ContentEncoding = validEncoding;
+                        response.ContentEncoding = validEncoding.FirstOrDefault(x => x == "gzip");
+                        
+                        using var stream = new MemoryStream();
+                        using var gzipStream = new GZipStream(stream, CompressionLevel.Optimal);
+
+                        await gzipStream.WriteAsync(Encoding.ASCII.GetBytes(requestArgument));
+
+                        stream.Position = 0;
+                        requestArgument = Encoding.ASCII.GetString(stream.ToArray());
                     }
                 }
 
                 response.HttpStatusCode = HttpStatusCode.OK;
                 response.ContentType = HttpContentTypes.TextPlain;
-                response.ContentLength = requestArgument.Length;
+                response.ContentLength = requestArgument!.Length;
                 response.Content = requestArgument;
 
                 break;
             case EndpointPaths.UserAgent:
-                var userAgentHeader = RegexParser.UserAgentRegex().Match(decodedReceivedData).ToString()[12..];
+                var userAgentHeader = headers["User-Agent"];
 
                 response.HttpStatusCode = HttpStatusCode.OK;
                 response.ContentType = HttpContentTypes.TextPlain;

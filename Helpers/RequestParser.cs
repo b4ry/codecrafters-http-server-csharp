@@ -4,7 +4,7 @@ namespace codecrafters_http_server.Helpers
 {
     internal static class RequestParser
     {
-        internal static (string urLine, Dictionary<string, string> headers, string body) ParseRequest(byte[] request)
+        internal static (string urlLine, Dictionary<string, string> headers, string body) ParseRequest(byte[] request)
         {
             var decodedReceivedData = Encoding.ASCII.GetString(request).Split(Constants.Constants.Crlf);
             var requestLine = decodedReceivedData[0];
@@ -16,7 +16,7 @@ namespace codecrafters_http_server.Helpers
 
         private static Dictionary<string, string> ParseHeaders(IEnumerable<string> headers)
         {
-            Dictionary<string, string> parsedHeaders = new();
+            Dictionary<string, string> parsedHeaders = [];
 
             foreach (var header in headers)
             {

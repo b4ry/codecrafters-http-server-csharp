@@ -15,9 +15,9 @@ while (true)
         var receivedData = new byte[2048];
         await socket.ReceiveAsync(receivedData);
 
-        var (urLine, headers, body) = RequestParser.ParseRequest(receivedData);
+        var (urlLine, headers, body) = RequestParser.ParseRequest(receivedData);
 
-        var urlPath = RegexParser.UrlPathRegex().Match(urLine).ToString();
+        var urlPath = RegexParser.UrlPathRegex().Match(urlLine).ToString();
         var response = new Response()
         {
             Protocol = HttpProtocols.Http11,
@@ -27,7 +27,7 @@ while (true)
         switch (urlPath)
         {
             case string s when s.StartsWith(EndpointPaths.Files):
-                await EndpointsHandler.HandleFiles(urLine, headers, body, urlPath, response);
+                await EndpointsHandler.HandleFiles(urlLine, headers, body, urlPath, response);
 
                 break;
             case string s when s.StartsWith(EndpointPaths.Echo):

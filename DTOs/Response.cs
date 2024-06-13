@@ -11,6 +11,7 @@ namespace codecrafters_http_server.DTOs
         internal int? ContentLength { get; set; }
         internal string? Content { get; set; }
         internal string? ContentEncoding { get; set; }
+        internal byte[]? CompressedContent { get; set; }
 
         public override string ToString()
         {

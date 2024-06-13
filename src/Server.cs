@@ -79,14 +79,22 @@ while (true)
                         }
 
                         stream.Position = 0;
-                        requestArgument = Encoding.ASCII.GetString(stream.ToArray());
+                        response.CompressedContent = stream.ToArray();
                     }
                 }
 
                 response.HttpStatusCode = HttpStatusCode.OK;
                 response.ContentType = HttpContentTypes.TextPlain;
-                response.ContentLength = requestArgument!.Length;
-                response.Content = requestArgument;
+
+                if(response.CompressedContent?.Length > 0)
+                {
+                    response.ContentLength = response.CompressedContent.Length;
+                }
+                else
+                {
+                    response.ContentLength = requestArgument!.Length;
+                    response.Content = requestArgument;
+                }
 
                 break;
             case EndpointPaths.UserAgent:
@@ -109,6 +117,11 @@ while (true)
         try
         {
             var responseBytes = Encoding.ASCII.GetBytes(response.ToString());
+
+            if (response.CompressedContent?.Length > 0)
+            {
+                responseBytes = [..responseBytes, ..response.CompressedContent];
+            }
 
             await socket.SendAsync(responseBytes);
         }

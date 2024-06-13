@@ -53,7 +53,7 @@ while (true)
                 else if(httpMethod == HttpMethod.Post.ToString())
                 {
                     var contentLength = headers["Content-Length"];
-                    var dataToWrite = body;
+                    var dataToWrite = body[..int.Parse(contentLength)];
 
                     await File.WriteAllTextAsync(filePath, dataToWrite);
 

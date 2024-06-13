@@ -16,7 +16,7 @@ namespace codecrafters_http_server.Helpers
 
         private static Dictionary<string, string> ParseHeaders(IEnumerable<string> headers)
         {
-            Dictionary<string, string> parsedHeaders = new Dictionary<string, string>();
+            Dictionary<string, string> parsedHeaders = new();
 
             foreach (var header in headers)
             {

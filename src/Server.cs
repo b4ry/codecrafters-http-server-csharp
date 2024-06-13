@@ -72,11 +72,11 @@ while (true)
                     {
                         response.ContentEncoding = "gzip";
                         
-                        var stream = new MemoryStream();
-                        var gzipStream = new GZipStream(stream, CompressionLevel.Optimal, leaveOpen: true);
-
+                        using var stream = new MemoryStream();
+                        using (var gzipStream = new GZipStream(stream, CompressionLevel.Optimal, leaveOpen: true))
+                        {
                             await gzipStream.WriteAsync(Encoding.ASCII.GetBytes(requestArgument));
-
+                        }
 
                         stream.Position = 0;
                         requestArgument = Encoding.ASCII.GetString(stream.ToArray());

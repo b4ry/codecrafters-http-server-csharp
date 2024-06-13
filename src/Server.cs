@@ -70,7 +70,7 @@ while (true)
 
                     if(validEncoding.Contains("gzip"))
                     {
-                        response.ContentEncoding = validEncoding.FirstOrDefault(x => x == "gzip");
+                        response.ContentEncoding = "gzip";
                         
                         using var stream = new MemoryStream();
                         using (var gzipStream = new GZipStream(stream, CompressionLevel.Optimal, leaveOpen: true))

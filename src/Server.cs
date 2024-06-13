@@ -1,7 +1,6 @@
 using codecrafters_http_server.Constants;
 using codecrafters_http_server.DTOs;
 using codecrafters_http_server.Helpers;
-using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -24,89 +23,22 @@ while (true)
             Protocol = HttpProtocols.Http11,
             HttpStatusCode = HttpStatusCode.OK
         };
-        string requestArgument = string.Empty;
 
         switch (urlPath)
         {
             case string s when s.StartsWith(EndpointPaths.Files):
-                var httpMethod = RegexParser.HttpMethodRegex.Match(urLine).ToString();
-                requestArgument = urlPath[7..];
-                var filePath = $"{Environment.GetCommandLineArgs()[2]}{requestArgument}";
+                await EndpointsHandler.HandleFiles(urLine, headers, body, urlPath, response);
 
-                if (httpMethod == HttpMethod.Get.ToString())
-                {
-                    if (File.Exists(filePath))
-                    {
-                        var file = await File.ReadAllBytesAsync(filePath);
-                        var fileContent = Encoding.ASCII.GetString(file);
-
-                        response.HttpStatusCode = HttpStatusCode.OK;
-                        response.ContentType = HttpContentTypes.ApplicationOctetStream;
-                        response.ContentLength = file.Length;
-                        response.Content = fileContent;
-                    }
-                    else
-                    {
-                        response.HttpStatusCode = HttpStatusCode.NotFound;
-                    }
-                }
-                else if(httpMethod == HttpMethod.Post.ToString())
-                {
-                    var contentLength = headers["Content-Length"];
-                    var dataToWrite = body[..int.Parse(contentLength)];
-
-                    await File.WriteAllTextAsync(filePath, dataToWrite);
-
-                    response.HttpStatusCode = HttpStatusCode.Created;
-                }
                 break;
             case string s when s.StartsWith(EndpointPaths.Echo):
-                requestArgument = urlPath[6..];
-                headers.TryGetValue("Accept-Encoding", out string? encodings);
-
-                if (encodings?.Length > 0)
-                {
-                    var validEncoding = encodings.Split(", ").Intersect(Constants.ValidEncodings);
-
-                    if(validEncoding.Contains("gzip"))
-                    {
-                        response.ContentEncoding = "gzip";
-                        
-                        using var stream = new MemoryStream();
-                        using (var gzipStream = new GZipStream(stream, CompressionMode.Compress, leaveOpen: true))
-                        {
-                            await gzipStream.WriteAsync(Encoding.ASCII.GetBytes(requestArgument));
-                        }
-
-                        stream.Position = 0;
-                        response.CompressedContent = stream.ToArray();
-                    }
-                }
-
-                response.HttpStatusCode = HttpStatusCode.OK;
-                response.ContentType = HttpContentTypes.TextPlain;
-
-                if(response.CompressedContent?.Length > 0)
-                {
-                    response.ContentLength = response.CompressedContent.Length;
-                }
-                else
-                {
-                    response.ContentLength = requestArgument!.Length;
-                    response.Content = requestArgument;
-                }
+                await EndpointsHandler.HandleEcho(headers, urlPath, response);
 
                 break;
             case EndpointPaths.UserAgent:
-                var userAgentHeader = headers["User-Agent"];
-
-                response.HttpStatusCode = HttpStatusCode.OK;
-                response.ContentType = HttpContentTypes.TextPlain;
-                response.ContentLength = userAgentHeader.Length;
-                response.Content = userAgentHeader;
+                EndpointsHandler.HandleUserAgent(headers, response);
 
                 break;
-            case EndpointPaths.Default:
+            case EndpointPaths.Home:
                 break;
             default:
                 response.HttpStatusCode = HttpStatusCode.NotFound;

@@ -1,17 +1,12 @@
+using codecrafters_http_server.Constants;
+using codecrafters_http_server.DTOs;
+using codecrafters_http_server.Helpers;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Text.RegularExpressions;
 
 TcpListener server = new(IPAddress.Any, 4221);
 server.Start();
-
-Regex httpMethodRegex = new("^GET|POST");
-Regex urlPathRegex = new("\\/\\S*");
-Regex userAgentRegex = new("[Uu]ser-[Aa]gent: \\S*");
-Regex contentLengthRegex = new("[Cc]ontent-[Ll]ength: \\S*");
-Regex acceptEncodingRegex = new("[Aa]ccept-[Ee]ncoding: \\S*");
-var crlf = "\r\n";
 
 while (true)
 {
@@ -21,92 +16,91 @@ while (true)
         await socket.ReceiveAsync(receivedData);
 
         var decodedReceivedData = Encoding.ASCII.GetString(receivedData);
-        var urlPath = urlPathRegex.Match(decodedReceivedData).ToString();
-        var response = Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK{crlf}{crlf}");
+
+        var urlPath = RegexParser.UrlPathRegex().Match(decodedReceivedData).ToString();
+        var response = new Response()
+        {
+            Protocol = HttpProtocols.Http11,
+            HttpStatusCode = HttpStatusCode.OK
+        };
         string requestArgument = string.Empty;
 
         switch (urlPath)
         {
-            case string s when s.StartsWith("/files/"):
-                var httpMethod = httpMethodRegex.Match(decodedReceivedData).ToString();
+            case string s when s.StartsWith(EndpointPaths.Files):
+                var httpMethod = RegexParser.HttpMethodRegex.Match(decodedReceivedData).ToString();
                 requestArgument = urlPath[7..];
                 var filePath = $"{Environment.GetCommandLineArgs()[2]}{requestArgument}";
 
-                if (httpMethod == "GET")
+                if (httpMethod == HttpMethod.Get.ToString())
                 {
                     if (File.Exists(filePath))
                     {
                         var file = await File.ReadAllBytesAsync(filePath);
                         var fileContent = Encoding.ASCII.GetString(file);
 
-                        response =
-                            Encoding.ASCII.GetBytes(
-                                $"HTTP/1.1 200 OK{crlf}" +
-                                $"Content-Type: application/octet-stream{crlf}" +
-                                $"Content-Length:{file.Length}{crlf}{crlf}{fileContent}");
+                        response.HttpStatusCode = HttpStatusCode.OK;
+                        response.ContentType = HttpContentTypes.ApplicationOctetStream;
+                        response.ContentLength = file.Length;
+                        response.Content = fileContent;
                     }
                     else
                     {
-                        response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
+                        response.HttpStatusCode = HttpStatusCode.NotFound;
                     }
                 }
-                else if(httpMethod == "POST")
+                else if(httpMethod == HttpMethod.Post.ToString())
                 {
-                    var contentLength = int.Parse(contentLengthRegex.Match(decodedReceivedData).ToString()[16..]);
-                    var dataToWrite = decodedReceivedData.Split($"{crlf}{crlf}")[1][..contentLength];
+                    var contentLength = int.Parse(RegexParser.ContentLengthRegex().Match(decodedReceivedData).ToString()[16..]);
+                    var dataToWrite = decodedReceivedData.Split($"{Constants.Crlf}{Constants.Crlf}")[1][..contentLength];
 
                     await File.WriteAllTextAsync(filePath, dataToWrite);
 
-                    response = Encoding.ASCII.GetBytes($"HTTP/1.1 201 Created{crlf}{crlf}");
+                    response.HttpStatusCode = HttpStatusCode.Created;
                 }
                 break;
-            case string s when s.StartsWith("/echo/"):
+            case string s when s.StartsWith(EndpointPaths.Echo):
                 requestArgument = urlPath[6..];
-                var acceptEncoding = acceptEncodingRegex.Match(decodedReceivedData)?.ToString();
+                var encodings = decodedReceivedData.Split(Constants.Crlf).FirstOrDefault(x => x.StartsWith("Accept-Encoding:"))?[16..].Split(",").Select(x => x.Trim());
 
-                if(acceptEncoding?.Length > 16)
+                if (encodings?.Count() > 0)
                 {
-                    acceptEncoding = acceptEncoding[17..];
+                    var validEncoding = encodings.Intersect(Constants.ValidEncodings).FirstOrDefault();
+
+                    if(validEncoding != null)
+                    {
+                        response.ContentEncoding = validEncoding;
+                    }
                 }
 
-                if (acceptEncoding == "invalid-encoding")
-                {
-                    response =
-                        Encoding.ASCII.GetBytes(
-                            $"HTTP/1.1 200 OK{crlf}" +
-                            $"Content-Type: text/plain{crlf}" +
-                            $"Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
-                }
-                else
-                {
-                    response =
-                        Encoding.ASCII.GetBytes(
-                            $"HTTP/1.1 200 OK{crlf}" +
-                            $"Content-Encoding: {acceptEncoding}{crlf}" + 
-                            $"Content-Type: text/plain{crlf}" +
-                            $"Content-Length:{requestArgument.Length}{crlf}{crlf}{requestArgument}");
-                }
+                response.HttpStatusCode = HttpStatusCode.OK;
+                response.ContentType = HttpContentTypes.TextPlain;
+                response.ContentLength = requestArgument.Length;
+                response.Content = requestArgument;
 
                 break;
-            case "/user-agent":
-                var userAgentHeader = userAgentRegex.Match(decodedReceivedData).ToString()[12..];
+            case EndpointPaths.UserAgent:
+                var userAgentHeader = RegexParser.UserAgentRegex().Match(decodedReceivedData).ToString()[12..];
 
-                response =
-                    Encoding.ASCII.GetBytes(
-                        $"HTTP/1.1 200 OK{crlf}" +
-                        $"Content-Type: text/plain{crlf}" +
-                        $"Content-Length:{userAgentHeader.Length}{crlf}{crlf}{userAgentHeader}");
+                response.HttpStatusCode = HttpStatusCode.OK;
+                response.ContentType = HttpContentTypes.TextPlain;
+                response.ContentLength = userAgentHeader.Length;
+                response.Content = userAgentHeader;
+
                 break;
-            case "/":
+            case EndpointPaths.Default:
                 break;
             default:
-                response = Encoding.ASCII.GetBytes($"HTTP/1.1 404 Not Found{crlf}{crlf}");
+                response.HttpStatusCode = HttpStatusCode.NotFound;
+
                 break;
         }
 
         try
         {
-            await socket.SendAsync(response);
+            var responseBytes = Encoding.ASCII.GetBytes(response.ToString());
+
+            await socket.SendAsync(responseBytes);
         }
         catch (Exception ex)
         {
